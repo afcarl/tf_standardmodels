@@ -1,6 +1,7 @@
 from sklearn.base import TransformerMixin
 from sklearn.utils import check_array
 import tensorflow as tf
+import numpy
 
 __author__ = 'Romain Tavenard romain.tavenard[at]univ-rennes2.fr'
 
@@ -38,13 +39,15 @@ class AutoEncoder(TransformerMixin):
     ------
         [MNIST Dataset] http://yann.lecun.com/exdb/mnist/
     """
-    def __init__(self, feature_layer_sizes=(100,), activation="relu", learning_rate=0.01, n_iter=20, random_seed=None):
+    def __init__(self, feature_layer_sizes=(100,), activation="relu", learning_rate=0.01, n_iter=20, batch_size=256,
+                 random_seed=None):
         self.feature_layer_sizes_ = feature_layer_sizes
         self.n_feature_layers = len(self.feature_layer_sizes_)
         self.activation = activation
         self.learning_rate = learning_rate
         self.n_iter = n_iter
         self.random_seed = random_seed
+        self.batch_size = batch_size
 
         if self.activation == "relu":
             self.activation_fun = tf.nn.relu
@@ -64,31 +67,41 @@ class AutoEncoder(TransformerMixin):
         self.X_ = None
         self.final_features_ = None
         self.tf_session_ = None
+        self.cost_ = None
+        self.optimizer_ = None
 
     def fit(self, X):
         if self.random_seed is not None:
             tf.set_random_seed(self.random_seed)
-        X = check_array(X, ensure_2d=True)
+        X = check_array(X, ensure_2d=True, copy=True)
         n_input = X.shape[1]
+        n_batches = int(X.shape[0] / self.batch_size)
         self._init_weights_and_bias(n_input)
         self._build_encoder()
         self.final_features_ = self.encoder_layers_[-1]
         self._build_decoder()
         y_pred = self.decoder_layers_[-1]
         y_true = self.X_
-        cost = tf.reduce_mean(tf.pow(y_true - y_pred, 2))
-        optimizer = tf.train.RMSPropOptimizer(self.learning_rate).minimize(cost)
+        self.cost_ = tf.reduce_mean(tf.pow(y_true - y_pred, 2))
+        self.optimizer_ = tf.train.RMSPropOptimizer(self.learning_rate).minimize(self.cost_)
 
         init = tf.global_variables_initializer()
         self.tf_session_ = tf.Session()
         self.tf_session_.run(init)
-        for iter in range(self.n_iter):
-            _, c = self.tf_session_.run([optimizer, cost], feed_dict={self.X_: X})
-            print("Epoch: %04d cost=%.9f" % (iter + 1, c))
-        print("Optimization Finished!")
+        for iteration in range(self.n_iter):
+            for batch in range(n_batches):
+                indices_batch = numpy.random.choice(X.shape[0], size=self.batch_size)
+                self.tf_session_.run(self.optimizer_, feed_dict={self.X_: X[indices_batch]})
+            c = self.tf_session_.run(self.cost_, feed_dict={self.X_: X})
+            print("Epoch: %04d, cost=%.9f" % (iteration + 1, c))
+        print("Optimization finished after %d iterations" % (iteration + 1))
 
     def transform(self, X):
-        return self.tf_session_.run(self.encoder_layers_[-1], feed_dict={self.X_: X})
+        return self.tf_session_.run(self.final_features_, feed_dict={self.X_: X})
+
+    def transform_and_back(self, X):
+        print(self.tf_session_.run(self.cost_, feed_dict={self.X_: X}))
+        return self.tf_session_.run(self.decoder_layers_[-1], feed_dict={self.X_: X})
 
     def inverse_transform(self, X):
         return self.tf_session_.run(self.decoder_layers_[-1], feed_dict={self.final_features_: X})

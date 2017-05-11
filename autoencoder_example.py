@@ -19,6 +19,8 @@ import matplotlib.pyplot as plt
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets("MNIST_data", one_hot=True)
 
+print(mnist.train.images[0])
+
 # Parameters
 learning_rate = 0.01
 training_epochs = 20
