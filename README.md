@@ -2,7 +2,7 @@ This repository implements standard Neural Network architectures using [TensorFl
 These architectures are implemented as `scikit-learn`-compatible models.
 To code these models, I was inspired by the great 
 [`aymericdamien/TensorFlow-Examples`](https://github.com/aymericdamien/TensorFlow-Examples) GitHub repository: 
-do not hesitate to visit it if you aim at building your own neural network models using Tensor Flow.  
+you should visit it if you aim at building your own neural network models using Tensor Flow.  
 
 # Requirements
 
