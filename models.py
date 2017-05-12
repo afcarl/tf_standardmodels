@@ -11,8 +11,8 @@ class AutoEncoder(TransformerMixin):
 
     Implement a (possibly multi-layer) auto-encoder to perform feature extraction using TensorFlow.
 
-    Attributes:
-    -----------
+    Attributes
+    ----------
     feature_layer_sizes: tuple of ints, default (100, )
         Number of neurons in each layer of the auto-encoder.
         Decoder layers should not be included in the tuple since their size is inferred from those of the encoder.
@@ -24,19 +24,21 @@ class AutoEncoder(TransformerMixin):
         The learning rate used. It controls the step-size in updating the weights.
     n_iter: int, default: 20
         The number of iterations in the learning process.
+    batch_size: int, default: 256
+        The number of training samples in each batch of the batch stochatic gradient descent.
     radom_seed: int, default: None
         The seed used to initialize TensorFlow at each fit call.
         If None, no seed is forced at fit time.
 
 
-    References:
-    -----------
+    References
+    ----------
         Y. LeCun, L. Bottou, Y. Bengio, and P. Haffner. "Gradient-based
         learning applied to document recognition." Proceedings of the IEEE,
         86(11):2278-2324, November 1998.
 
-    Links:
-    ------
+    Links
+    -----
         [MNIST Dataset] http://yann.lecun.com/exdb/mnist/
     """
     def __init__(self, feature_layer_sizes=(100,), activation="relu", learning_rate=0.01, n_iter=20, batch_size=256,
@@ -112,8 +114,8 @@ class AutoEncoder(TransformerMixin):
     def _init_weights_and_bias(self, n_input):
         """Init weights and biases with the correct number of neurons.
 
-        Examples:
-        ---------
+        Examples
+        --------
         >>> m = AutoEncoder(feature_layer_sizes=(5, 5))
         >>> m._init_weights_and_bias(n_input=10)
         >>> len(m.weights_encoder_)
@@ -199,6 +201,7 @@ class AutoEncoder(TransformerMixin):
         return s
 
     def __del__(self):
+        """Properly release variables associated to the model (and close TensorFlow session)."""
         if self.tf_session_ is not None:
             print("Properly closing TensorFlow session.")
             self.tf_session_.close()
@@ -206,11 +209,21 @@ class AutoEncoder(TransformerMixin):
             print("No need to close any session, since nothing was fitted.")
 
 def shape(tensor):
+    """Return the shape of a tensor as a tuple
+
+    Parameters
+    ----------
+    tensor: tf.Tensor
+
+    Returns
+    -------
+    tuple
+        A numpy-style shape tuple
+    """
     s = tensor.get_shape()
     return tuple([s[i].value for i in range(0, len(s))])
 
 if __name__ == "__main__":
     ae = AutoEncoder(feature_layer_sizes=(256, 128))
     print(ae.n_feature_layers)
-    #ae.fit()
     del ae
