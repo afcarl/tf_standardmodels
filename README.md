@@ -14,12 +14,11 @@ tensorflow
 
 # Available models
 
-None
+* Autoencoders
 
 # Models we plan to integrate
 
-1. Autoencoders
-2. Stacked autoencoders
-3. MLP (with the option to initialize using a pre-trained Stacked AE)
-4. CNN?
-5. RNN?
+1. Stacked autoencoders
+2. MLP (with the option to initialize using a pre-trained Stacked AE)
+3. CNN?
+4. RNN?

@@ -16,13 +16,13 @@ examples_to_show = 10
 seed = 0
 
 numpy.random.seed(seed)
-ae = AutoEncoder(feature_layer_sizes=(256, 128), random_seed=seed, n_iter=5)
+ae = AutoEncoder(feature_layer_sizes=(256, 128), random_seed=seed, n_iter=20, activation="logistic")
 ae.fit(X_train)
+print(ae)
 
 numpy.random.shuffle(X_test)
 
 X_test_reconstruct = ae.transform_and_back(X_test)
-print(X_test_reconstruct.shape)
 f, a = pylab.subplots(2, examples_to_show, figsize=(examples_to_show, 2))
 for i in range(examples_to_show):
     a[0][i].imshow(numpy.reshape(X_test[i], (28, 28)))

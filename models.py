@@ -65,10 +65,17 @@ class AutoEncoder(TransformerMixin):
         self.decoder_layers_ = []
 
         self.X_ = None
-        self.final_features_ = None
         self.tf_session_ = None
         self.cost_ = None
         self.optimizer_ = None
+
+    @property
+    def final_features_(self):
+        return self.encoder_layers_[-1]
+
+    @property
+    def X_reconstructed_(self):
+        return self.decoder_layers_[-1]
 
     def fit(self, X):
         if self.random_seed is not None:
@@ -78,11 +85,8 @@ class AutoEncoder(TransformerMixin):
         n_batches = int(X.shape[0] / self.batch_size)
         self._init_weights_and_bias(n_input)
         self._build_encoder()
-        self.final_features_ = self.encoder_layers_[-1]
         self._build_decoder()
-        y_pred = self.decoder_layers_[-1]
-        y_true = self.X_
-        self.cost_ = tf.reduce_mean(tf.pow(y_true - y_pred, 2))
+        self.cost_ = tf.reduce_mean(tf.pow(self.X_ - self.X_reconstructed_, 2))
         self.optimizer_ = tf.train.RMSPropOptimizer(self.learning_rate).minimize(self.cost_)
 
         init = tf.global_variables_initializer()
@@ -94,17 +98,16 @@ class AutoEncoder(TransformerMixin):
                 self.tf_session_.run(self.optimizer_, feed_dict={self.X_: X[indices_batch]})
             c = self.tf_session_.run(self.cost_, feed_dict={self.X_: X})
             print("Epoch: %04d, cost=%.9f" % (iteration + 1, c))
-        print("Optimization finished after %d iterations" % (iteration + 1))
+        print("Optimization finished after %d iterations" % (self.n_iter))
 
     def transform(self, X):
         return self.tf_session_.run(self.final_features_, feed_dict={self.X_: X})
 
     def transform_and_back(self, X):
-        print(self.tf_session_.run(self.cost_, feed_dict={self.X_: X}))
-        return self.tf_session_.run(self.decoder_layers_[-1], feed_dict={self.X_: X})
+        return self.tf_session_.run(self.X_reconstructed_, feed_dict={self.X_: X})
 
     def inverse_transform(self, X):
-        return self.tf_session_.run(self.decoder_layers_[-1], feed_dict={self.final_features_: X})
+        return self.tf_session_.run(self.X_reconstructed_, feed_dict={self.final_features_: X})
 
     def _init_weights_and_bias(self, n_input):
         """Init weights and biases with the correct number of neurons.
@@ -125,7 +128,7 @@ class AutoEncoder(TransformerMixin):
         self.weights_decoder_ = []
         self.bias_decoder_ = []
 
-        # Encoder
+        # Encoder weights / bias
         self.weights_encoder_.append(tf.Variable(tf.random_normal([n_input, self.feature_layer_sizes_[0]])))
         for layer in range(1, self.n_feature_layers):
             self.weights_encoder_.append(tf.Variable(tf.random_normal([self.feature_layer_sizes_[layer - 1],
@@ -134,7 +137,7 @@ class AutoEncoder(TransformerMixin):
         for layer in range(1, self.n_feature_layers):
             self.bias_encoder_.append(tf.Variable(tf.random_normal([self.feature_layer_sizes_[layer]])))
 
-        # Decoder
+        # Decoder weights / bias
         for layer in range(self.n_feature_layers - 1, 0, -1):
             self.weights_decoder_.append(tf.Variable(tf.random_normal([self.feature_layer_sizes_[layer],
                                                                        self.feature_layer_sizes_[layer - 1]])))
@@ -150,21 +153,50 @@ class AutoEncoder(TransformerMixin):
         self.encoder_layers_.append(self.activation_fun(linear_part))
 
         for layer in range(1, self.n_feature_layers):
-            linear_part = tf.add(tf.matmul(self.encoder_layers_[-1], self.weights_encoder_[layer]),
+            linear_part = tf.add(tf.matmul(self.encoder_layers_[layer - 1], self.weights_encoder_[layer]),
                                  self.bias_encoder_[layer])
             self.encoder_layers_.append(self.activation_fun(linear_part))
 
     def _build_decoder(self):
         self.decoder_layers_ = []
 
-        linear_part = tf.add(tf.matmul(self.final_features_, self.weights_decoder_[0]),
-                             self.bias_decoder_[0])
+        linear_part = tf.add(tf.matmul(self.final_features_, self.weights_decoder_[0]), self.bias_decoder_[0])
         self.decoder_layers_.append(self.activation_fun(linear_part))
 
         for layer in range(1, self.n_feature_layers):
-            linear_part = tf.add(tf.matmul(self.decoder_layers_[-1], self.weights_decoder_[layer]),
+            linear_part = tf.add(tf.matmul(self.decoder_layers_[layer - 1], self.weights_decoder_[layer]),
                                  self.bias_decoder_[layer])
             self.decoder_layers_.append(self.activation_fun(linear_part))
+
+    def __str__(self):
+        """Represent the NN as a string.
+
+        Example:
+        --------
+        >>> m = AutoEncoder(feature_layer_sizes=(5, 6), n_iter=0)
+        >>> m.fit(numpy.zeros((2, 10)))
+        Optimization finished after 0 iterations
+        >>> print(m)
+        10 -> W:10x5, b:5 -> 5 -> W:5x6, b:6 -> 6 -> W:6x5, b:5 -> 5 -> W:5x10, b:10 -> 10
+        """
+        s = "%d -> " % shape(self.X_)[1]
+        # Encoder
+        for layer in range(self.n_feature_layers):
+            w_i, w_o = shape(self.weights_encoder_[layer])
+            b = shape(self.bias_encoder_[layer])[0]
+            neurons = shape(self.encoder_layers_[layer])[1]
+            s += "W:%dx%d, b:%d -> %d -> " % (w_i, w_o, b, neurons)
+        # Decoder
+        for layer in range(self.n_feature_layers):
+            w_i, w_o = shape(self.weights_decoder_[layer])
+            b = shape(self.bias_decoder_[layer])[0]
+            neurons = shape(self.decoder_layers_[layer])[1]
+            if layer < self.n_feature_layers - 1:
+                s += "W:%dx%d, b:%d -> %d -> " % (w_i, w_o, b, neurons)
+            else:
+                s += "W:%dx%d, b:%d -> " % (w_i, w_o, b)
+        s += "%d" % shape(self.X_reconstructed_)[1]
+        return s
 
     def __del__(self):
         if self.tf_session_ is not None:
@@ -173,6 +205,9 @@ class AutoEncoder(TransformerMixin):
         else:
             print("No need to close any session, since nothing was fitted.")
 
+def shape(tensor):
+    s = tensor.get_shape()
+    return tuple([s[i].value for i in range(0, len(s))])
 
 if __name__ == "__main__":
     ae = AutoEncoder(feature_layer_sizes=(256, 128))
